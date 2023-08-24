@@ -12,7 +12,7 @@ description:
   Rhyolite backends are designed to deliver live-updating data to reflex-powered applications.
 
 library
-  hs-source-dirs:   .
+  hs-source-dirs:   src
   build-depends:
       base
     , beam-automigrate

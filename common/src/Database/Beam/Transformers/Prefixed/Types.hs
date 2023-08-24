@@ -1,3 +1,4 @@
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Database.Beam.Transformers.Prefixed.Types where
 
