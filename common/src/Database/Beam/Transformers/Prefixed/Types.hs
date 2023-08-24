@@ -1,9 +1,15 @@
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Database.Beam.Transformers.Prefixed.Types where
 
 import Control.Lens.Iso
-import Data.Kind (Constraint)
+import Data.Kind (Constraint, Type)
 import Database.Beam
 
 data PrefixedTable prefix tbl f = PrefixedTable
@@ -11,7 +17,7 @@ data PrefixedTable prefix tbl f = PrefixedTable
   , _prefixedTable_value :: tbl f
   } deriving (Generic)
 
-type HasPrefixedTableConstraint (c :: * -> Constraint) prefix tbl f =
+type HasPrefixedTableConstraint (c :: Type -> Constraint) prefix tbl f =
   ( c (prefix f)
   , c (tbl f)
   )
@@ -32,7 +38,7 @@ instance (Beamable prefix, Typeable prefix, Table tbl) => Table (PrefixedTable p
     , _prefixedTableId_value = primaryKey $ _prefixedTable_value v
     }
 
-type HasPrefixedTableIdConstraint (c :: * -> Constraint) prefix tbl f =
+type HasPrefixedTableIdConstraint (c :: Type -> Constraint) prefix tbl f =
   ( c (prefix f)
   , c (PrimaryKey tbl f)
   )
