@@ -1,0 +1,31 @@
+name:          beam-transformers-backend
+version:       0.1
+license:       BSD3
+copyright:     Copyright (C) Obsidian Systems LLC 2023
+author:        Obsidian Systems LLC
+maintainer:    maintainer@obsidian.systems
+stability:     Experimental
+build-type:    Simple
+cabal-version: >=1.2
+synopsis:      Backend infrastructure to support FRP-based frontends
+description:
+  Rhyolite backends are designed to deliver live-updating data to reflex-powered applications.
+
+library
+  hs-source-dirs:   .
+  build-depends:
+      base
+    , beam-automigrate
+    , beam-core
+    , beam-postgres
+    , beam-transformers-common
+    , transformers
+
+  exposed-modules:
+    Database.Beam.Transformers.Prefixed
+    Database.Beam.Transformers.Virtual
+
+  other-extensions: TemplateHaskell
+  ghc-options:
+    -Wall -fno-warn-unused-do-bind -fwarn-tabs -funbox-strict-fields
+    -O2 -fprof-auto-calls
