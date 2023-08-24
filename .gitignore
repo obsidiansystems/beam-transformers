@@ -1,0 +1,9 @@
+dist/
+dist-newstyle/
+result
+result-*
+*.project.local
+.ghc.*
+.attr-cache
+tags
+TAGS
