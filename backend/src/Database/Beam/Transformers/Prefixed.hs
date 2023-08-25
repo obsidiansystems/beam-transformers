@@ -13,6 +13,7 @@ module Database.Beam.Transformers.Prefixed
 import Data.Functor.Identity
 import Database.Beam
 import Database.Beam.AutoMigrate
+import Database.Beam.Backend.SQL
 import Database.Beam.Postgres
 import Database.Beam.Schema.Tables
 
@@ -20,14 +21,15 @@ import Database.Beam.Transformers.Prefixed.Types
 import Database.Beam.Transformers.Virtual
 
 prefixedV
-  :: forall prefix tbl db
-  .  ( Beamable tbl
-     , HasTableEquality Postgres prefix
-     , SqlValableTable Postgres prefix
+  :: forall prefix tbl be db
+  .  ( BeamSqlBackend be
+     , Beamable tbl
+     , HasTableEquality be prefix
+     , SqlValableTable be prefix
      )
   => prefix Identity
-  -> VirtualTable db (PrefixedTable prefix tbl)
-  -> VirtualTable db tbl
+  -> VirtualTable be db (PrefixedTable prefix tbl)
+  -> VirtualTable be db tbl
 prefixedV prefix tbl = VirtualTable
   { -- Filter to only include our established prefix
     _virtualTable_all = fmap _prefixedTable_value $ filter_ (\p -> _prefixedTable_prefix p ==. val_ prefix) $ _virtualTable_all tbl

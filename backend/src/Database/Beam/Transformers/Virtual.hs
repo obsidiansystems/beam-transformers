@@ -17,36 +17,36 @@ import Database.Beam.Postgres.Syntax
 import Database.Beam.Query.CTE as CTE
 import Database.Beam.Query.Internal
 
-data VirtualTable db tbl = VirtualTable
+data VirtualTable be db tbl = VirtualTable
   { _virtualTable_all
     :: forall s
-    .  Q Postgres db s (tbl (QExpr Postgres s))
+    .  Q be db s (tbl (QExpr be s))
   , _virtualTable_insertFrom
-    :: (forall s. Q Postgres db s (tbl (QExpr Postgres s)))
-    -> SqlInsert Postgres tbl
+    :: (forall s. Q be db s (tbl (QExpr be s)))
+    -> SqlInsert be tbl
   , _virtualTable_insertFromOnConflict
-    :: (forall s. Q Postgres db s (tbl (QExpr Postgres s)))
+    :: (forall s. Q be db s (tbl (QExpr be s)))
     -> SqlConflictTargetV
     -> SqlConflictActionV
-    -> SqlInsert Postgres tbl
+    -> SqlInsert be tbl
   , _virtualTable_insertFromWith
-    :: (forall s. With Postgres db (Q Postgres db s (tbl (QExpr Postgres s))))
-    -> SqlInsert Postgres tbl
+    :: (forall s. With be db (Q be db s (tbl (QExpr be s))))
+    -> SqlInsert be tbl
   , _virtualTable_insertExpressions
-    :: (forall s. [tbl (QExpr Postgres s)])
-    -> SqlInsert Postgres tbl
+    :: (forall s. [tbl (QExpr be s)])
+    -> SqlInsert be tbl
   , _virtualTable_insertExpressionsOnConflict
-    :: (forall s. [tbl (QExpr Postgres s)])
+    :: (forall s. [tbl (QExpr be s)])
     -> SqlConflictTargetV
     -> SqlConflictActionV
-    -> SqlInsert Postgres tbl
+    -> SqlInsert be tbl
   , _virtualTable_update
-    :: (forall s. tbl (QField s) -> QAssignment Postgres s)
-    -> (forall s. tbl (QExpr Postgres s) -> QExpr Postgres s Bool)
-    -> SqlUpdate Postgres tbl
+    :: (forall s. tbl (QField s) -> QAssignment be s)
+    -> (forall s. tbl (QExpr be s) -> QExpr be s Bool)
+    -> SqlUpdate be tbl
   , _virtualTable_delete
-    :: (forall s. tbl (QExpr Postgres s) -> QExpr Postgres s Bool)
-    -> SqlDelete Postgres tbl
+    :: (forall s. tbl (QExpr be s) -> QExpr be s Bool)
+    -> SqlDelete be tbl
   }
 
 fromConcrete
@@ -54,7 +54,7 @@ fromConcrete
      , Beamable tbl
      )
   => DatabaseEntity Postgres db (TableEntity tbl)
-  -> VirtualTable db tbl
+  -> VirtualTable Postgres db tbl
 fromConcrete tbl = VirtualTable
   { _virtualTable_all = all_ tbl
   , _virtualTable_insertFrom = \vals -> insert tbl (insertFrom vals)
@@ -78,53 +78,57 @@ fromConcrete tbl = VirtualTable
   }
 
 allV_
-  :: VirtualTable db tbl
-  -> Q Postgres db s (tbl (QExpr Postgres s))
+  :: VirtualTable be db tbl
+  -> Q be db s (tbl (QExpr be s))
 allV_ = _virtualTable_all
 
 lookupV_
-  :: ( Table tbl
-     , SqlValableTable Postgres (PrimaryKey tbl)
-     , HasTableEquality Postgres (PrimaryKey tbl)
+  :: ( BeamSqlBackend be
+     , HasQBuilder be
+     , Table tbl
+     , SqlValableTable be (PrimaryKey tbl)
+     , HasTableEquality be (PrimaryKey tbl)
      )
-  => VirtualTable db tbl
+  => VirtualTable be db tbl
   -> PrimaryKey tbl Identity
-  -> SqlSelect Postgres (tbl Identity)
+  -> SqlSelect be (tbl Identity)
 lookupV_ tbl k = select $ do
   r <- allV_ tbl
   guard_ $ pk r ==. val_ k
   pure r
 
 insertValuesV
-  :: ( SqlValableTable Postgres tbl
+  :: ( BeamSqlBackend be
+     , SqlValableTable be tbl
      )
-  => VirtualTable db tbl
+  => VirtualTable be db tbl
   -> [tbl Identity]
-  -> SqlInsert Postgres tbl
+  -> SqlInsert be tbl
 insertValuesV tbl vals = _virtualTable_insertExpressions tbl $ fmap val_ vals
 
 insertValuesOnConflictV
-  :: ( SqlValableTable Postgres tbl
+  :: ( BeamSqlBackend be
+     , SqlValableTable be tbl
      )
-  => VirtualTable db tbl
+  => VirtualTable be db tbl
   -> SqlConflictTargetV
   -> SqlConflictActionV
   -> [tbl Identity]
-  -> SqlInsert Postgres tbl
+  -> SqlInsert be tbl
 insertValuesOnConflictV tbl target action vals = _virtualTable_insertExpressionsOnConflict tbl (fmap val_ vals) target action
 
 insertExpressionsV
-  :: VirtualTable db tbl
-  -> (forall s. [tbl (QExpr Postgres s)])
-  -> SqlInsert Postgres tbl
+  :: VirtualTable be db tbl
+  -> (forall s. [tbl (QExpr be s)])
+  -> SqlInsert be tbl
 insertExpressionsV tbl vals = _virtualTable_insertExpressions tbl vals
 
 insertExpressionsOnConflictV
-  :: VirtualTable db tbl
+  :: VirtualTable be db tbl
   -> SqlConflictTargetV
   -> SqlConflictActionV
-  -> (forall s. [tbl (QExpr Postgres s)])
-  -> SqlInsert Postgres tbl
+  -> (forall s. [tbl (QExpr be s)])
+  -> SqlInsert be tbl
 insertExpressionsOnConflictV tbl target action vals = _virtualTable_insertExpressionsOnConflict tbl vals target action
 
 insertExpressionsOnConflictReturningV
@@ -135,7 +139,7 @@ insertExpressionsOnConflictReturningV
        (WithExprContext (BeamSqlBackendExpressionSyntax' Postgres))
        a
      )
-  => VirtualTable db tbl
+  => VirtualTable Postgres db tbl
   -> SqlConflictTargetV
   -> SqlConflictActionV
   -> (tbl (QExpr Postgres PostgresInaccessible) -> a)
@@ -144,17 +148,17 @@ insertExpressionsOnConflictReturningV
 insertExpressionsOnConflictReturningV tbl target action ret vals = _virtualTable_insertExpressionsOnConflict tbl vals target action `returning` ret
 
 insertFromV
-  :: VirtualTable db tbl
-  -> (forall s. Q Postgres db s (tbl (QExpr Postgres s)))
-  -> SqlInsert Postgres tbl
+  :: VirtualTable be db tbl
+  -> (forall s. Q be db s (tbl (QExpr be s)))
+  -> SqlInsert be tbl
 insertFromV tbl expr = _virtualTable_insertFrom tbl expr
 
 insertFromOnConflictV
-  :: VirtualTable db tbl
+  :: VirtualTable be db tbl
   -> SqlConflictTargetV
   -> SqlConflictActionV
-  -> (forall s. Q Postgres db s (tbl (QExpr Postgres s)))
-  -> SqlInsert Postgres tbl
+  -> (forall s. Q be db s (tbl (QExpr be s)))
+  -> SqlInsert be tbl
 insertFromOnConflictV tbl target action expr = _virtualTable_insertFromOnConflict tbl expr target action
 
 insertFromOnConflictReturningV
@@ -165,7 +169,7 @@ insertFromOnConflictReturningV
        (WithExprContext (BeamSqlBackendExpressionSyntax' Postgres))
        a
      )
-  => VirtualTable db tbl
+  => VirtualTable Postgres db tbl
   -> SqlConflictTargetV
   -> SqlConflictActionV
   -> (tbl (QExpr Postgres PostgresInaccessible) -> a)
@@ -175,9 +179,10 @@ insertFromOnConflictReturningV tbl target action ret expr = _virtualTable_insert
 
 -- TODO this is based on our own
 insertFromWithV
-  :: VirtualTable db tbl
-  -> (forall s. With Postgres db (Q Postgres db s (tbl (QExpr Postgres s))))
-  -> SqlInsert Postgres tbl
+  :: BeamSqlBackend be
+  => VirtualTable be db tbl
+  -> (forall s. With be db (Q be db s (tbl (QExpr be s))))
+  -> SqlInsert be tbl
 insertFromWithV tbl expr = _virtualTable_insertFromWith tbl expr
 
 data SqlConflictTargetV = SqlConflictTargetV_AnyConflict
@@ -185,7 +190,10 @@ data SqlConflictTargetV = SqlConflictTargetV_AnyConflict
 anyConflictV :: SqlConflictTargetV
 anyConflictV = SqlConflictTargetV_AnyConflict
 
-toBeamSqlConflictTarget :: SqlConflictTargetV -> SqlConflictTarget Postgres tbl
+toBeamSqlConflictTarget
+  :: BeamHasInsertOnConflict be
+  => SqlConflictTargetV
+  -> SqlConflictTarget be tbl
 toBeamSqlConflictTarget = \case
   SqlConflictTargetV_AnyConflict -> anyConflict
 
@@ -194,39 +202,45 @@ data SqlConflictActionV = SqlConflictActionV_DoNothing
 onConflictDoNothingV :: SqlConflictActionV
 onConflictDoNothingV = SqlConflictActionV_DoNothing
 
-toBeamSqlConflictAction :: SqlConflictActionV -> SqlConflictAction Postgres tbl
+toBeamSqlConflictAction
+  :: BeamHasInsertOnConflict be
+  => SqlConflictActionV -> SqlConflictAction be tbl
 toBeamSqlConflictAction = \case
   SqlConflictActionV_DoNothing -> onConflictDoNothing
 
 updateV
-  :: VirtualTable db tbl
-  -> (forall s. tbl (QField s) -> QAssignment Postgres s)
-  -> (forall s. tbl (QExpr Postgres s) -> QExpr Postgres s Bool)
-  -> SqlUpdate Postgres tbl
+  :: BeamSqlBackend be
+  => VirtualTable be db tbl
+  -> (forall s. tbl (QField s) -> QAssignment be s)
+  -> (forall s. tbl (QExpr be s) -> QExpr be s Bool)
+  -> SqlUpdate be tbl
 updateV = _virtualTable_update
 
 deleteV
-  :: VirtualTable db tbl
-  -> (forall s. tbl (QExpr Postgres s) -> QExpr Postgres s Bool)
-  -> SqlDelete Postgres tbl
+  :: BeamSqlBackend be
+  => VirtualTable be db tbl
+  -> (forall s. tbl (QExpr be s) -> QExpr be s Bool)
+  -> SqlDelete be tbl
 deleteV = _virtualTable_delete
 
 joinV_
-  :: VirtualTable db tbl
-  -> (tbl (QExpr Postgres s) -> QExpr Postgres s Bool)
-  -> Q Postgres db s (tbl (QExpr Postgres s))
+  :: BeamSqlBackend be
+  => VirtualTable be db tbl
+  -> (tbl (QExpr be s) -> QExpr be s Bool)
+  -> Q be db s (tbl (QExpr be s))
 joinV_ tbl cond = do
   row <- allV_ tbl
   guard_ $ cond row
   pure row
 
 updateRowByKeyV
-  :: ( Table tbl
-     , HasTableEquality Postgres (PrimaryKey tbl)
-     , SqlValableTable Postgres (PrimaryKey tbl)
+  :: ( BeamSqlBackend be
+     , Table tbl
+     , HasTableEquality be (PrimaryKey tbl)
+     , SqlValableTable be (PrimaryKey tbl)
      )
-  => VirtualTable db tbl
+  => VirtualTable be db tbl
   -> PrimaryKey tbl Identity
-  -> (forall s. tbl (QField s) -> QAssignment Postgres s)
-  -> SqlUpdate Postgres tbl
+  -> (forall s. tbl (QField s) -> QAssignment be s)
+  -> SqlUpdate be tbl
 updateRowByKeyV tbl key assignments = updateV tbl assignments $ \t -> pk t ==. val_ key
